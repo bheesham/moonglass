@@ -8,8 +8,7 @@ import subprocess
 import sys
 
 from dulwich.errors import NotGitRepository
-from dulwich.diff_tree import walk_trees
-from dulwich.patch import get_summary, write_tree_diff
+from dulwich.objects import ShaFile
 from dulwich.repo import Repo
 
 
@@ -28,9 +27,10 @@ def _check_ctags():
                               stdin=subprocess.DEVNULL,
                               stdout=subprocess.DEVNULL,
                               stderr=subprocess.DEVNULL)
-
     except subprocess.CalledProcessError:
-        _exit("ctags command not found on the system.  Please make sure you have it installed.")
+        return "ctags command not found on the system.  Please make sure you have it installed."
+
+    return False
 
 
 def _check_repo(path):
@@ -50,15 +50,22 @@ def main(path):
     Evolved code-diff analysis.
     """
 
-    _check_ctags()
+    err = _check_ctags()
+    if err:
+        _exit(err)
 
     repo, err = _check_repo(path)
     if err:
         _exit(err)
 
     for x in repo.get_walker():
-        print(repr(x.changes()))
-        pass
+        for typ, old, new in x.changes():
+            if typ != 'modify':
+                continue
+
+            # TODO: compute tags for each commit, store them, then diff them.
+            repo.get_object(old.sha).as_raw_string()
+            repo.get_object(new.sha).as_raw_string()
 
 
 if __name__ == '__main__':
